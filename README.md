@@ -138,13 +138,13 @@ If not, data *will* get overwritten.
 Building your own version
 -------------------------
 
-The supplied JAR contains everything you need to run, built for Java 1.7 or above.
-
-Of course, you are welcome to build your own version of this utility. Keep in mind that it uses the following libraries:
+This project is mostly complete, but you'll need to build it for your environment. This requires the following libraries:
 
   - gson 2.2.4 (chances are likely that more recent versions work fine)
   - joda-time 2.4 (chances are likely that more recent versions work fine)
   - ojdbc6 (Oracle JDBC 6)
+
+Once you get your IDE setup, it's just a matter of building your own JAR to execute.
 
 One last thing
 --------------
