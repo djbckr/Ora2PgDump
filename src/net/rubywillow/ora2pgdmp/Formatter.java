@@ -278,13 +278,14 @@ public class Formatter implements Callable<Integer> {
         if (str.isEmpty())
             return;
 
-        // PostgreSQL COPY data cannot have carriage returns, line-feeds, tab characters, or single backslashes
+        // PostgreSQL COPY data cannot have carriage returns, line-feeds, tab characters,
+        // or single backslashes. These are all control characters.
         // replace these with "\r", "\n", "\t", "\\" in the final output
 
-        if ((str.indexOf(backslash, 0) == -1) &&
-                (str.indexOf(linefeed) == -1) &&
+        if ((str.indexOf(linefeed) == -1) &&
+                (str.indexOf(carriagereturn) == -1) &&
                 (str.indexOf(tabchar) == -1) &&
-                (str.indexOf(carriagereturn) == -1)) {
+                (str.indexOf(backslash, 0) == -1)) {
             // if there are no special characters, just write the string as-is
             doWrite(str);
         } else {
