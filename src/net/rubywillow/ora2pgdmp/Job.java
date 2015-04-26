@@ -49,6 +49,7 @@ public class Job implements Runnable {
       Properties props = new Properties();
       props.setProperty( "user", cfg.getOrausername() );
       props.setProperty( "password", cfg.getOrapassword() );
+      
       conn = (OracleConnection) DriverManager.getConnection( "jdbc:oracle:thin:@" + cfg.getOradb(), props );
       try {
         conn.setAutoCommit( false );
@@ -107,18 +108,11 @@ public class Job implements Runnable {
     writer = new BufferedWriter( new OutputStreamWriter( new GZIPOutputStream( new BufferedOutputStream( new FileOutputStream( workFile ) ) ) ) );
 
     // assemble some of the file header (continued on step3)
-    writer.write( "\n" );
-    writer.write( "-- output file from OracleExp-PostgresImp --\n" );
-    writer.write( "\n" );
-    writer.write( "SET statement_timeout = 0;\n" );
-    writer.write( "SET lock_timeout = 0;\n" );
-    writer.write( "SET client_encoding = 'UTF8';\n" );
-    writer.write( "SET standard_conforming_strings = on;\n" );
-    writer.write( "\n" );
+    writer.write( "\n-- output file from OracleExp-PostgresImp --\n\n" );
+    writer.write( "SET statement_timeout = 0;\nSET lock_timeout = 0;\nSET client_encoding = 'UTF8';\nSET standard_conforming_strings = on;\n\n" );
     writer.write( "\\echo -n Loading " );
     writer.write( cfg.getTarget() );
-    writer.write( " ...\n" );
-    writer.write( "begin;\n" );
+    writer.write( " ...\nbegin;\n" );
     if ( cfg.isTruncate() ) {
       writer.write( "TRUNCATE TABLE " );
       writer.write( cfg.getTarget() );
@@ -170,7 +164,7 @@ public class Job implements Runnable {
     writer.write( "COPY " );
     writer.write( cfg.getTarget() );
     writer.write( " (" );
-    for ( int i = 1, j = 0; j < colCount; i++, j++ ) {
+    for ( int i = 1; i <= colCount; i++ ) {
       if ( comma == null )
         comma = ", ";
       else
@@ -195,6 +189,7 @@ public class Job implements Runnable {
         int y = 0;
         do {
           try {
+            // take() blocks until a message is available
             y = results.take().get();
           } catch ( InterruptedException e ) {
             e.printStackTrace();

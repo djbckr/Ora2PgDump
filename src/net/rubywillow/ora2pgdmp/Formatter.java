@@ -22,10 +22,10 @@ import java.util.concurrent.locks.ReentrantLock;
 */
 public class Formatter implements Callable<Integer> {
 
-    private static final int backslash = 92;
-    private static final int linefeed = 10;
-    private static final int carriagereturn = 13;
-    private static final int tabchar = 9;
+    private static final char tabchar = 9;
+    private static final char linefeed = 10;
+    private static final char carriagereturn = 13;
+    private static final char backslash = 92;
 
     // if a date comes back as a java.sql.Timestamp, use this date formatter
     private SimpleDateFormat sdf;
@@ -142,79 +142,45 @@ public class Formatter implements Callable<Integer> {
 
         if (obj == null) {
             doWrite("\\N");
-            return;
-        }
-
-        if (obj instanceof java.lang.String) {
+        } else if (obj instanceof java.lang.String) {
             escape((String) obj);
-            return;
-        }
-
-        if (obj instanceof oracle.sql.NUMBER) {
+        } else if (obj instanceof oracle.sql.NUMBER) {
             doWrite(((oracle.sql.NUMBER) obj).stringValue());
-            return;
-        }
-
-        if (obj instanceof java.math.BigDecimal) {
+        } else if (obj instanceof java.math.BigDecimal) {
             doWrite(((BigDecimal) obj).toPlainString());
-            return;
-        }
-
-        if (obj instanceof oracle.sql.CHAR) {
+        } else if (obj instanceof oracle.sql.CHAR) {
             escape(((oracle.sql.CHAR) obj).stringValue());
-            return;
-        }
-
-        if (obj instanceof oracle.sql.DATE) {
+        } else if (obj instanceof oracle.sql.DATE) {
             doWrite(((oracle.sql.DATE) obj).stringValue());
-            return;
-        }
-
-        if (obj instanceof java.sql.Timestamp) {
-
+        } else if (obj instanceof java.sql.Timestamp) {
             if (sdf == null)
                 sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-
             doWrite(sdf.format((Timestamp) obj));
-            return;
-        }
-
-        if (obj instanceof oracle.sql.TIMESTAMP) {
+        } else if (obj instanceof oracle.sql.TIMESTAMP) {
             doWrite(((oracle.sql.TIMESTAMP) obj).stringValue());
-            return;
-        }
-
-        if (obj instanceof oracle.sql.TIMESTAMPTZ) {
+        } else if (obj instanceof oracle.sql.TIMESTAMPTZ) {
             doWrite(((oracle.sql.TIMESTAMPTZ) obj).stringValue());
-            return;
-        }
-
-        if (obj instanceof oracle.sql.TIMESTAMPLTZ) {
+        } else if (obj instanceof oracle.sql.TIMESTAMPLTZ) {
             doWrite(((oracle.sql.TIMESTAMPLTZ) obj).stringValue());
-            return;
-        }
-
-        if (obj instanceof oracle.sql.INTERVALYM) {
+        } else if (obj instanceof oracle.sql.INTERVALYM) {
             doWrite(((oracle.sql.INTERVALYM) obj).stringValue());
-            return;
-        }
-
-        if (obj instanceof oracle.sql.INTERVALDS) {
+        } else if (obj instanceof oracle.sql.INTERVALDS) {
             doWrite(((oracle.sql.INTERVALDS) obj).stringValue());
-            return;
-        }
-
-        if (obj instanceof byte[]) {
+        } else if (obj instanceof byte[]) {
             bytesToHex((byte[]) obj, true);
-            return;
-        }
-
-        if (obj instanceof oracle.sql.RAW) {
+        } else if (obj instanceof oracle.sql.RAW) {
             bytesToHex(((oracle.sql.RAW) obj).getBytes(), true);
-            return;
-        }
-
-        if (obj instanceof oracle.sql.CLOB) {
+        } else if (obj instanceof java.lang.Float) {
+            doWrite(new BigDecimal((Float) obj).toPlainString());
+        } else if (obj instanceof java.lang.Double) {
+            doWrite(new BigDecimal((Double) obj).toPlainString());
+        } else if (obj instanceof oracle.sql.BINARY_DOUBLE) {
+            doWrite(((oracle.sql.BINARY_DOUBLE) obj).bigDecimalValue().toPlainString());
+        } else if (obj instanceof oracle.sql.BINARY_FLOAT) {
+            doWrite(((oracle.sql.BINARY_FLOAT) obj).bigDecimalValue().toPlainString());
+        } else if (obj instanceof oracle.sql.ANYDATA) {
+            processObject(((ANYDATA) obj).accessDatum());
+        } else if (obj instanceof oracle.sql.CLOB) {
             final Reader r = ((oracle.sql.CLOB) obj).getCharacterStream();
 
             char[] buf = new char[16384];
@@ -224,10 +190,7 @@ public class Formatter implements Callable<Integer> {
                 escape(new String(buf, 0, readAmount));
                 readAmount = r.read(buf);
             }
-            return;
-        }
-
-        if (obj instanceof oracle.sql.BLOB) {
+        } else if (obj instanceof oracle.sql.BLOB) {
             final InputStream r = ((BLOB) obj).getBinaryStream();
 
             byte[] buf = new byte[16384];
@@ -240,37 +203,9 @@ public class Formatter implements Callable<Integer> {
                     head = false;
                 readAmount = r.read(buf);
             }
-
-            return;
+        } else {
+            throw new SQLException("An unsupported datatype was encountered: " + obj.getClass().getCanonicalName());
         }
-
-        if (obj instanceof java.lang.Float) {
-            doWrite(new BigDecimal((Float) obj).toPlainString());
-            return;
-        }
-
-        if (obj instanceof java.lang.Double) {
-            doWrite(new BigDecimal((Double) obj).toPlainString());
-            return;
-        }
-
-        if (obj instanceof oracle.sql.ANYDATA) {
-            // recursive call
-            processObject(((ANYDATA) obj).accessDatum());
-            return;
-        }
-
-        if (obj instanceof oracle.sql.BINARY_DOUBLE) {
-            doWrite(((oracle.sql.BINARY_DOUBLE) obj).bigDecimalValue().toPlainString());
-            return;
-        }
-
-        if (obj instanceof oracle.sql.BINARY_FLOAT) {
-            doWrite(((oracle.sql.BINARY_FLOAT) obj).bigDecimalValue().toPlainString());
-            return;
-        }
-
-        throw new SQLException("An unsupported datatype was encountered: " + obj.getClass().getCanonicalName());
     }
 
     private void escape(final String str) throws Exception {
@@ -282,43 +217,52 @@ public class Formatter implements Callable<Integer> {
         // or single backslashes. These are all control characters.
         // replace these with "\r", "\n", "\t", "\\" in the final output
 
-        if ((str.indexOf(linefeed) == -1) &&
-                (str.indexOf(carriagereturn) == -1) &&
-                (str.indexOf(tabchar) == -1) &&
-                (str.indexOf(backslash, 0) == -1)) {
-            // if there are no special characters, just write the string as-is
-            doWrite(str);
-        } else {
-            // It's fastest to manipulate this as an array of characters (using StringBuilder of course)
-            StringBuilder sb = new StringBuilder(str);
+        int strLen = str.length();
+        int dstLen = 0;
+        char chr;
 
-            // easiest to start at the end and work backwards (and probably faster)
-            int j = sb.length();
-            int i = j;
-            i--;
-
-            while (i >= 0) {
-                int x = sb.charAt(i);
-                switch (x) {
-                    case backslash:
-                        sb.replace(i, j, "\\\\");
-                        break;
-                    case linefeed:
-                        sb.replace(i, j, "\\n");
-                        break;
-                    case carriagereturn:
-                        sb.replace(i, j, "\\r");
-                        break;
-                    case tabchar:
-                        sb.replace(i, j, "\\t");
-                        break;
-                    default:
-                        break;
-                }
-                i--;
-                j--;
+        // Test string for the special characters.
+        // When one is found, add another character to dstLen 
+        for (int z = 0; z < strLen; z++) {
+            chr = str.charAt(z);
+            dstLen++;
+            if (chr == tabchar || chr == linefeed || chr == carriagereturn || chr == backslash) {
+                dstLen++;
             }
-            doWrite(sb.toString());
+        }
+
+        // if no special chars were found, dstLen should == strLen
+        if (dstLen > strLen) {
+            // dstLen indicates how many characters are needed for our new string
+            char[] chars = new char[dstLen];
+            int y = 0;
+            for (int z = 0; z < strLen; z++) {
+                chr = str.charAt(z);
+                if (chr == tabchar || chr == linefeed || chr == carriagereturn || chr == backslash) {
+                    chars[y++] = '\\';
+                    switch (chr) {
+                        case tabchar:
+                            chars[y++] = 't';
+                            break;
+                        case linefeed:
+                            chars[y++] = 'n';
+                            break;
+                        case carriagereturn:
+                            chars[y++] = 'r';
+                            break;
+                        case backslash:
+                            chars[y++] = '\\';
+                            break;
+                        default:
+                            break;
+                    }
+                } else {
+                    chars[y++] = chr;
+                }
+            }
+            doWrite(chars);
+        } else {
+            doWrite(str);
         }
     }
 
@@ -338,7 +282,7 @@ public class Formatter implements Callable<Integer> {
         }
 
         if (header)
-            doWrite("\\\\x");
+            doWrite("\\x");
 
         doWrite(hexChars);
     }
